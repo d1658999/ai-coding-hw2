@@ -11,7 +11,7 @@ type ChatPanelProps = {
   messages: ChatMessage[];
   pending: boolean;
   error: string | null;
-  hasKey: boolean;
+  ready: boolean;
   providerLabel: string;
   modelName: string;
   onClose: () => void;
@@ -25,7 +25,7 @@ export default function ChatPanel({
   messages,
   pending,
   error,
-  hasKey,
+  ready,
   providerLabel,
   modelName,
   onClose,
@@ -169,9 +169,9 @@ export default function ChatPanel({
       </div>
 
       <div className="relative z-10 border-t border-white/8 bg-[#0a0a14]/90 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] backdrop-blur-xl sm:px-6">
-        {!hasKey && (
+        {!ready && (
           <div className="mx-auto mb-3 flex w-full max-w-3xl flex-col gap-2 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs text-amber-100/85 sm:flex-row sm:items-center sm:justify-between">
-            <span>還沒有 {providerLabel} 的 API Key，設定好才能開始對話。</span>
+            <span>還沒有可用的憑證：填入 API Key，或改用本機 Ollama（免金鑰）。</span>
             <button
               type="button"
               onClick={onOpenSettings}
@@ -243,6 +243,7 @@ function MessageBubble({ message, character }: { message: ChatMessage; character
         </div>
       )}
       <div
+        data-role={message.role}
         className={`max-w-[85%] whitespace-pre-wrap break-words rounded-2xl px-4 py-3 text-sm leading-6 sm:max-w-[75%] ${
           isUser ? "rounded-br-md" : "rounded-bl-md"
         }`}

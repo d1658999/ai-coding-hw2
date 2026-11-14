@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { PROVIDERS, PROVIDER_IDS, type ProviderId } from "@/lib/chat-config";
-import type { ApiSettings } from "@/lib/settings";
+import { LOCAL_OLLAMA_BASE_URL, isLocalOllamaBaseUrl, type ApiSettings } from "@/lib/settings";
 import { CheckIcon, CloseIcon, EyeIcon, EyeOffIcon, KeyIcon, ShieldIcon } from "./icons";
 
 const ALLOWED_BASE_HOSTS: Record<ProviderId, readonly string[]> = {
   ollama: ["ollama.com", "localhost", "127.0.0.1"],
   openai: ["api.openai.com"],
+  gemini: ["generativelanguage.googleapis.com"],
 };
 
 type SettingsDialogProps = {
@@ -45,6 +46,15 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
 
   const provider = draft.provider;
   const providerConfig = PROVIDERS[provider];
+  const localOllama = provider === "ollama" && isLocalOllamaBaseUrl(draft.baseUrls.ollama);
+
+  const setBaseUrl = (value: string) => {
+    setDraft((previous) => ({
+      ...previous,
+      baseUrls: { ...previous.baseUrls, [previous.provider]: value },
+    }));
+    setError(null);
+  };
 
   const updateKey = (value: string) => {
     setDraft((previous) => ({
@@ -137,7 +147,7 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
           <div className="space-y-5 px-5 py-5 sm:px-6">
             <div>
               <p className="text-xs font-medium text-white/55">供應商</p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-3 gap-2">
                 {PROVIDER_IDS.map((id) => {
                   const config = PROVIDERS[id];
                   const active = draft.provider === id;
@@ -152,26 +162,57 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
                         setDraft((previous) => ({ ...previous, provider: id }));
                         setError(null);
                       }}
-                      className={`rounded-2xl border px-3 py-2.5 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${
+                      className={`rounded-2xl border px-2.5 py-2.5 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${
                         active
                           ? "border-white/25 bg-white/10"
                           : "border-white/10 bg-white/[0.03] hover:border-white/20"
                       }`}
                     >
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-white">{config.label}</span>
-                        {configured && <CheckIcon className="h-4 w-4 text-emerald-400" />}
+                      <span className="flex items-center justify-between gap-1.5">
+                        <span className="truncate text-[13px] font-semibold text-white">{config.label}</span>
+                        {configured && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" />}
                       </span>
-                      <span className="mt-0.5 block truncate text-[11px] text-white/40">{config.model}</span>
+                      <span className="mt-0.5 block truncate text-[10px] text-white/40">{config.model}</span>
                     </button>
                   );
                 })}
               </div>
+
+              {provider === "ollama" && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    aria-pressed={!localOllama}
+                    onClick={() => setBaseUrl(PROVIDERS.ollama.defaultBaseUrl)}
+                    className={`rounded-xl border px-2.5 py-2 text-left text-[11px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${
+                      !localOllama
+                        ? "border-rose-300/40 bg-rose-300/10 text-rose-100"
+                        : "border-white/10 bg-white/[0.02] text-white/45 hover:border-white/20"
+                    }`}
+                  >
+                    <span className="block font-semibold">Ollama Cloud</span>
+                    <span className="block text-[10px] opacity-70">需要 API Key</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={localOllama}
+                    onClick={() => setBaseUrl(LOCAL_OLLAMA_BASE_URL)}
+                    className={`rounded-xl border px-2.5 py-2 text-left text-[11px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60 ${
+                      localOllama
+                        ? "border-emerald-300/40 bg-emerald-300/10 text-emerald-100"
+                        : "border-white/10 bg-white/[0.02] text-white/45 hover:border-white/20"
+                    }`}
+                  >
+                    <span className="block font-semibold">本機 Ollama</span>
+                    <span className="block text-[10px] opacity-70">免 API Key</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
               <label htmlFor="api-key" className="text-xs font-medium text-white/55">
-                {providerConfig.label} API Key
+                {providerConfig.label} API Key{localOllama ? "（可留空）" : ""}
               </label>
               <div className="relative mt-1.5">
                 <KeyIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
@@ -207,7 +248,11 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
                   ) : null}
                 </div>
               </div>
-              <p className="mt-1.5 text-[11px] leading-5 text-white/30">{providerConfig.note}</p>
+              <p className="mt-1.5 text-[11px] leading-5 text-white/30">
+                {localOllama
+                  ? "本機模式不需要 API Key。請確認本機 Ollama 已啟動並登入（ollama serve / ollama signin）。"
+                  : providerConfig.note}
+              </p>
             </div>
 
             <div>

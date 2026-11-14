@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { CHARACTERS, getCharacter, type CharacterId } from "@/lib/characters";
 import { MAX_MESSAGE_CHARS, PROVIDERS, type ChatMessage } from "@/lib/chat-config";
-import { createDefaultSettings, hasApiKey, type ApiSettings } from "@/lib/settings";
+import { canChat, createDefaultSettings, isLocalOllamaBaseUrl, type ApiSettings } from "@/lib/settings";
 import {
   clearSettingsStore,
   getSettingsServerSnapshot,
@@ -66,7 +66,10 @@ export default function HomeShell() {
 
   const activeCharacter = activeId ? getCharacter(activeId) : undefined;
   const providerConfig = PROVIDERS[settings.provider];
-  const configured = storedSettings !== null && hasApiKey(settings);
+  const usingLocalOllama =
+    settings.provider === "ollama" && isLocalOllamaBaseUrl(settings.baseUrls.ollama);
+  const providerLabel = usingLocalOllama ? "Ollama 本機" : providerConfig.label;
+  const configured = storedSettings !== null && canChat(settings);
 
   useEffect(() => {
     if (!activeId) return;
@@ -119,7 +122,7 @@ export default function HomeShell() {
       if (!characterId || pendingId) return;
 
       const apiKey = settings.apiKeys[settings.provider].trim();
-      if (!apiKey) {
+      if (!apiKey && !usingLocalOllama) {
         setError(`尚未設定 ${providerConfig.label} 的 API Key，請先到「API 設定」填入。`);
         setSettingsOpen(true);
         return;
@@ -136,12 +139,14 @@ export default function HomeShell() {
       setError(null);
 
       try {
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (apiKey) {
+          headers.Authorization = `Bearer ${apiKey}`;
+        }
+
         const response = await fetch("/api/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
+          headers,
           body: JSON.stringify({
             provider: settings.provider,
             characterId,
@@ -173,7 +178,7 @@ export default function HomeShell() {
         setPendingId(null);
       }
     },
-    [activeId, conversations, pendingId, providerConfig.label, settings],
+    [activeId, conversations, pendingId, providerConfig.label, settings, usingLocalOllama],
   );
 
   const steps = STEPS;
@@ -310,8 +315,8 @@ export default function HomeShell() {
           messages={conversations[activeCharacter.id] ?? []}
           pending={pendingId === activeCharacter.id}
           error={error}
-          hasKey={hasApiKey(settings)}
-          providerLabel={providerConfig.label}
+          ready={configured}
+          providerLabel={providerLabel}
           modelName={providerConfig.model}
           onClose={handleCloseChat}
           onSend={handleSend}

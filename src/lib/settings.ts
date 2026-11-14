@@ -9,13 +9,39 @@ export type ApiSettings = {
 
 export const SETTINGS_STORAGE_KEY = "ai-coding-hw2.settings.v1";
 
+export const LOCAL_OLLAMA_BASE_URL = "http://localhost:11434";
+
+export function isLocalOllamaBaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value.trim());
+    return (
+      ["localhost", "127.0.0.1"].includes(url.hostname) &&
+      (url.protocol === "http:" || url.protocol === "https:")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function requiresApiKey(settings: ApiSettings): boolean {
+  if (settings.provider === "openai") return true;
+  return !isLocalOllamaBaseUrl(settings.baseUrls.ollama);
+}
+
+export function canChat(settings: ApiSettings | null): boolean {
+  if (!settings) return false;
+  if (settings.apiKeys[settings.provider].trim().length > 0) return true;
+  return !requiresApiKey(settings);
+}
+
 export function createDefaultSettings(): ApiSettings {
   return {
     provider: "ollama",
-    apiKeys: { ollama: "", openai: "" },
+    apiKeys: { ollama: "", openai: "", gemini: "" },
     baseUrls: {
       ollama: PROVIDERS.ollama.defaultBaseUrl,
       openai: PROVIDERS.openai.defaultBaseUrl,
+      gemini: PROVIDERS.gemini.defaultBaseUrl,
     },
     displayName: "",
   };
@@ -42,6 +68,7 @@ export function loadSettings(): ApiSettings | null {
       apiKeys: {
         ollama: typeof rawKeys.ollama === "string" ? rawKeys.ollama : "",
         openai: typeof rawKeys.openai === "string" ? rawKeys.openai : "",
+        gemini: typeof rawKeys.gemini === "string" ? rawKeys.gemini : "",
       },
       baseUrls: {
         ollama:
@@ -52,6 +79,10 @@ export function loadSettings(): ApiSettings | null {
           typeof rawBaseUrls.openai === "string" && rawBaseUrls.openai.trim()
             ? rawBaseUrls.openai
             : defaults.baseUrls.openai,
+        gemini:
+          typeof rawBaseUrls.gemini === "string" && rawBaseUrls.gemini.trim()
+            ? rawBaseUrls.gemini
+            : defaults.baseUrls.gemini,
       },
       displayName: typeof record.displayName === "string" ? record.displayName.slice(0, 20) : "",
     };

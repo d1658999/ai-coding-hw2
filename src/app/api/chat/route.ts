@@ -67,6 +67,7 @@ function parseMessages(value: unknown): ChatMessage[] {
 const ALLOWED_BASE_HOSTS: Record<ProviderId, readonly string[]> = {
   ollama: ["ollama.com", "localhost", "127.0.0.1"],
   openai: ["api.openai.com"],
+  gemini: ["generativelanguage.googleapis.com"],
 };
 
 function resolveBaseUrl(provider: ProviderId, value: unknown): string {
@@ -111,8 +112,16 @@ function providerErrorStatus(status: number): number {
 
 function providerErrorMessage(status: number, detail: string): string {
   const suffix = detail ? `（${detail}）` : "";
+  const lowered = detail.toLowerCase();
 
-  if (status === 401 || status === 403) {
+  if (
+    status === 401 ||
+    status === 403 ||
+    lowered.includes("api key") ||
+    lowered.includes("api_key") ||
+    lowered.includes("unauthorized") ||
+    lowered.includes("permission")
+  ) {
     return "API Key 無效、已過期或沒有權限，請到「API 設定」確認。";
   }
   if (status === 404) {
@@ -148,9 +157,26 @@ function extractReply(provider: ProviderId, payload: unknown): string {
     return typeof message?.content === "string" ? message.content.trim() : "";
   }
 
+  if (provider === "gemini") {
+    const candidates = root.candidates;
+    if (!Array.isArray(candidates) || candidates.length === 0) return "";
+
+    const firstCandidate = asObject(candidates[0]);
+    const content = asObject(firstCandidate?.content);
+    const parts = content?.parts;
+    if (!Array.isArray(parts)) return "";
+
+    return parts
+      .map((part) => {
+        const objectPart = asObject(part);
+        return typeof objectPart?.text === "string" ? objectPart.text : "";
+      })
+      .join("")
+      .trim();
+  }
+
   const choices = root.choices;
   if (!Array.isArray(choices) || choices.length === 0) return "";
-
   const first = asObject(choices[0]);
   const message = asObject(first?.message);
   const content = message?.content;
@@ -178,23 +204,45 @@ async function callProvider(
   messages: ChatMessage[],
 ): Promise<string> {
   const isOllama = provider === "ollama";
-  const endpoint = isOllama ? `${baseUrl}/api/chat` : `${baseUrl}/chat/completions`;
+  const isGemini = provider === "gemini";
+  const endpoint = isOllama
+    ? `${baseUrl}/api/chat`
+    : isGemini
+      ? `${baseUrl}/models/${PROVIDERS.gemini.model}:generateContent`
+      : `${baseUrl}/chat/completions`;
   const providerMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
+  const requestBody = isGemini
+    ? {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: messages.map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: message.content }],
+        })),
+        generationConfig: { maxOutputTokens: 2048 },
+      }
+    : {
+        model: PROVIDERS[provider].model,
+        messages: providerMessages,
+        stream: false,
+      };
+
   let response: Response;
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    if (isGemini) {
+      headers["x-goog-api-key"] = apiKey;
+    } else {
+      headers.Authorization = `Bearer ${apiKey}`;
+    }
+  }
 
   try {
     response = await fetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: PROVIDERS[provider].model,
-        messages: providerMessages,
-        stream: false,
-      }),
+      headers,
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       cache: "no-store",
     });
@@ -233,6 +281,15 @@ async function callProvider(
   return reply;
 }
 
+function isLoopbackBaseUrl(baseUrl: string): boolean {
+  try {
+    const url = new URL(baseUrl);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const authorization = request.headers.get("authorization") ?? "";
@@ -240,11 +297,7 @@ export async function POST(request: Request) {
       ? authorization.slice(7).trim()
       : "";
 
-    if (!apiKey) {
-      throw new HttpError(401, "尚未設定 API Key，請先到「API 設定」填入。");
-    }
-
-    if (apiKey.length > 512 || !/^[\x21-\x7E]+$/.test(apiKey)) {
+    if (apiKey && (apiKey.length > 512 || !/^[\x21-\x7E]+$/.test(apiKey))) {
       throw new HttpError(400, "API Key 格式不正確。");
     }
 
@@ -272,6 +325,12 @@ export async function POST(request: Request) {
 
     const messages = parseMessages(data.messages);
     const baseUrl = resolveBaseUrl(data.provider, data.baseUrl);
+    const usesLocalOllama = data.provider === "ollama" && isLoopbackBaseUrl(baseUrl);
+
+    if (!apiKey && !usesLocalOllama) {
+      throw new HttpError(401, "尚未設定 API Key，請先到「API 設定」填入。");
+    }
+
     const systemPrompt = buildSystemPrompt(
       data.characterId as CharacterId,
       typeof data.displayName === "string" ? data.displayName : undefined,
