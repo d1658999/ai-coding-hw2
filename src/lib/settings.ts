@@ -1,4 +1,6 @@
-import { PROVIDERS, isProviderId, type ProviderId } from "./chat-config";
+import { PROVIDERS, isLocalOllamaBaseUrl, isProviderId, type ProviderId } from "./chat-config";
+
+export { LOCAL_OLLAMA_BASE_URL, isLocalOllamaBaseUrl } from "./chat-config";
 
 export type ApiSettings = {
   provider: ProviderId;
@@ -9,23 +11,11 @@ export type ApiSettings = {
 
 export const SETTINGS_STORAGE_KEY = "ai-coding-hw2.settings.v1";
 
-export const LOCAL_OLLAMA_BASE_URL = "http://localhost:11434";
-
-export function isLocalOllamaBaseUrl(value: string): boolean {
-  try {
-    const url = new URL(value.trim());
-    return (
-      ["localhost", "127.0.0.1"].includes(url.hostname) &&
-      (url.protocol === "http:" || url.protocol === "https:")
-    );
-  } catch {
-    return false;
-  }
-}
-
 export function requiresApiKey(settings: ApiSettings): boolean {
-  if (settings.provider === "openai") return true;
-  return !isLocalOllamaBaseUrl(settings.baseUrls.ollama);
+  if (settings.provider === "ollama") {
+    return !isLocalOllamaBaseUrl(settings.baseUrls.ollama);
+  }
+  return true;
 }
 
 export function canChat(settings: ApiSettings | null): boolean {

@@ -3,6 +3,7 @@ import {
   MAX_HISTORY_MESSAGES,
   MAX_MESSAGE_CHARS,
   PROVIDERS,
+  getRequestModel,
   isProviderId,
   type ChatMessage,
   type ChatRole,
@@ -205,10 +206,11 @@ async function callProvider(
 ): Promise<string> {
   const isOllama = provider === "ollama";
   const isGemini = provider === "gemini";
+  const model = getRequestModel(provider, baseUrl);
   const endpoint = isOllama
     ? `${baseUrl}/api/chat`
     : isGemini
-      ? `${baseUrl}/models/${PROVIDERS.gemini.model}:generateContent`
+      ? `${baseUrl}/models/${model}:generateContent`
       : `${baseUrl}/chat/completions`;
   const providerMessages = [{ role: "system", content: systemPrompt }, ...messages];
 
@@ -222,7 +224,7 @@ async function callProvider(
         generationConfig: { maxOutputTokens: 2048 },
       }
     : {
-        model: PROVIDERS[provider].model,
+        model,
         messages: providerMessages,
         stream: false,
       };

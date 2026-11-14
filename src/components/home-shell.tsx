@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { CHARACTERS, getCharacter, type CharacterId } from "@/lib/characters";
-import { MAX_MESSAGE_CHARS, PROVIDERS, type ChatMessage } from "@/lib/chat-config";
+import { MAX_MESSAGE_CHARS, PROVIDERS, getRequestModel, type ChatMessage } from "@/lib/chat-config";
 import { canChat, createDefaultSettings, isLocalOllamaBaseUrl, type ApiSettings } from "@/lib/settings";
 import {
   clearSettingsStore,
@@ -69,6 +69,7 @@ export default function HomeShell() {
   const usingLocalOllama =
     settings.provider === "ollama" && isLocalOllamaBaseUrl(settings.baseUrls.ollama);
   const providerLabel = usingLocalOllama ? "Ollama 本機" : providerConfig.label;
+  const modelName = getRequestModel(settings.provider, settings.baseUrls[settings.provider]);
   const configured = storedSettings !== null && canChat(settings);
 
   useEffect(() => {
@@ -317,7 +318,7 @@ export default function HomeShell() {
           error={error}
           ready={configured}
           providerLabel={providerLabel}
-          modelName={providerConfig.model}
+          modelName={modelName}
           onClose={handleCloseChat}
           onSend={handleSend}
           onReset={handleReset}

@@ -8,7 +8,7 @@
 - **AI 對話**：每位角色有獨立的角色設定與說話風格，回覆以繁體中文為主。
 - **BYOK（Bring Your Own Key）**：不用本站的環境變數，使用者在「API 設定」輸入自己的金鑰。
 - **金鑰存在瀏覽器**：設定寫入 `localStorage`（key：`ai-coding-hw2.settings.v1`），不會上傳到資料庫。
-- **固定模型**：Ollama `deepseek-v4.1-flash:1017-cloud`、OpenAI `gpt-6-luna`、Google Gemini `gemini-3.5-flash-lite`。
+- **固定模型**：Ollama Cloud `deepseek-v4.1-flash:1017`（本機 Ollama 自動改用別名 `deepseek-v4.1-flash:1017-cloud`）、OpenAI `gpt-6-luna`、Google Gemini `gemini-3.5-flash-lite`。
 - **深色響應式介面**：桌機、手機皆可使用；角色插圖為本站自製 AI 圖像。
 
 ## 金鑰如何流動
@@ -36,7 +36,7 @@
 2. 網站「API 設定 → Ollama → 本機 Ollama」按一下儲存，Base URL 會設為 `http://localhost:11434`。
 3. API Key 可以留空；聊天時前端不會帶 Authorization，伺服器也不會要求金鑰。
 
-模型名稱維持 `deepseek-v4.1-flash:1017-cloud`，本機 Ollama 會自動對應到雲端模型 `deepseek-v4.1-flash:1017`。
+模型會依模式自動切換：直連 `https://ollama.com` 使用 `deepseek-v4.1-flash:1017`；本機 Ollama 使用 `deepseek-v4.1-flash:1017-cloud` 別名，由本機代理到同一個雲端模型。
 
 ## 開發
 

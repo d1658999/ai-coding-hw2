@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { PROVIDERS, PROVIDER_IDS, type ProviderId } from "@/lib/chat-config";
+import { PROVIDERS, PROVIDER_IDS, getRequestModel, type ProviderId } from "@/lib/chat-config";
 import { LOCAL_OLLAMA_BASE_URL, isLocalOllamaBaseUrl, type ApiSettings } from "@/lib/settings";
 import { CheckIcon, CloseIcon, EyeIcon, EyeOffIcon, KeyIcon, ShieldIcon } from "./icons";
 
@@ -47,6 +47,7 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
   const provider = draft.provider;
   const providerConfig = PROVIDERS[provider];
   const localOllama = provider === "ollama" && isLocalOllamaBaseUrl(draft.baseUrls.ollama);
+  const activeModel = getRequestModel(provider, draft.baseUrls[provider]);
 
   const setBaseUrl = (value: string) => {
     setDraft((previous) => ({
@@ -317,7 +318,14 @@ export default function SettingsDialog({ settings, onClose, onSave, onClear }: S
                   不可更改
                 </span>
               </div>
-              <p className="mt-1.5 break-all font-mono text-xs text-white/70">{providerConfig.model}</p>
+              <p className="mt-1.5 break-all font-mono text-xs text-white/70">{activeModel}</p>
+              {provider === "ollama" && (
+                <p className="mt-1 text-[10px] leading-4 text-white/30">
+                  {localOllama
+                    ? "本機別名，Ollama 會代理到 deepseek-v4.1-flash:1017。"
+                    : "直連 ollama.com 使用正式模型名稱。"}
+                </p>
+              )}
             </div>
 
             {error && (
